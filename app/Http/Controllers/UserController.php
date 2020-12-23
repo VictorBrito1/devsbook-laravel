@@ -69,7 +69,78 @@ class UserController extends Controller
 
     public function update(Request $request)
     {
+        $data = $request->only(['name', 'email', 'password', 'password_confirmation', 'birth_date', 'city', 'work']);
+        $name = $data['name'] ?? '';
+        $email = $data['email'] ?? '';
+        $password = $data['password'] ?? '';
+        $password_confirmation = $data['password_confirmation'] ?? '';
+        $birth_date = $data['birth_date'] ?? '';
+        $city = $data['city'] ?? '';
+        $work = $data['work'] ?? '';
 
+        $validator = Validator::make($data, [
+            'name' => ['string', 'min:5', 'max:100'],
+            'email' => ['string', 'email'],
+            'birth_date' => ['date'],
+            'city' => ['string', 'max:100'],
+            'work' => ['string', 'max:100'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
+
+        $user = $this->currentUser;
+        $errors = [];
+
+        if ($email && $email !== $user->email) {
+            $validatorEmail = Validator::make(['email' => $email], ['email' => ['unique:users']]);
+
+            if ($validatorEmail->fails()) {
+                $errors[] = $validatorEmail->errors();
+            }
+        }
+
+        if ($password) {
+            $validatorPassword = Validator::make([
+                'password' => $password, 'password_confirmation' => $password_confirmation
+            ], ['password' => ['string', 'min:6', 'confirmed']]);
+
+            if ($validatorPassword->fails()) {
+                $errors[] = $validatorPassword->errors();
+            }
+        }
+        if ($errors) {
+            return response()->json(['errors' => $errors], 400);
+        }
+
+        if ($password) {
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            $user->password = $hash;
+        }
+
+        if ($email) {
+            $user->email = $email;
+        }
+
+        if ($name) {
+            $user->name = $name;
+        }
+
+        if ($birth_date) {
+            $user->birth_date = $birth_date;
+        }
+
+        if ($city) {
+            $user->city = $city;
+        }
+
+        if ($work) {
+            $user->work = $work;
+        }
+
+        $user->save();
+        return response()->json($user);
     }
 
     public function updateAvatar(Request $request)
