@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Intervention\Image\Facades\Image;
 
 class UserController extends Controller
 {
@@ -70,13 +71,6 @@ class UserController extends Controller
     public function update(Request $request)
     {
         $data = $request->only(['name', 'email', 'password', 'password_confirmation', 'birth_date', 'city', 'work']);
-        $name = $data['name'] ?? '';
-        $email = $data['email'] ?? '';
-        $password = $data['password'] ?? '';
-        $password_confirmation = $data['password_confirmation'] ?? '';
-        $birth_date = $data['birth_date'] ?? '';
-        $city = $data['city'] ?? '';
-        $work = $data['work'] ?? '';
 
         $validator = Validator::make($data, [
             'name' => ['string', 'min:5', 'max:100'],
@@ -89,6 +83,14 @@ class UserController extends Controller
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
+
+        $name = $data['name'] ?? '';
+        $email = $data['email'] ?? '';
+        $password = $data['password'] ?? '';
+        $password_confirmation = $data['password_confirmation'] ?? '';
+        $birth_date = $data['birth_date'] ?? '';
+        $city = $data['city'] ?? '';
+        $work = $data['work'] ?? '';
 
         $user = $this->currentUser;
         $errors = [];
@@ -143,8 +145,63 @@ class UserController extends Controller
         return response()->json($user);
     }
 
+    /**
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function updateAvatar(Request $request)
     {
+        $avatar = $request->file('avatar');
 
+        $validator = Validator::make(['avatar' => $avatar], [
+            'avatar' => ['required', 'mimetypes:image/jpeg,image/jpg,image/png'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()]);
+        } else {
+            $filename = md5(time().rand(0, 9999)) . '.jpg';
+            $path = public_path('/media/avatars');
+
+            Image::make($avatar->path())
+                ->fit(200, 200)
+                ->save("{$path}/{$filename}");
+
+            $user = User::find($this->currentUser['id']);
+            $user->avatar = $filename;
+            $user->save();
+
+            return response()->json(['url' => url("/media/avatars/{$filename}")]);
+        }
+    }
+
+    /**
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateCover(Request $request)
+    {
+        $cover = $request->file('cover');
+
+        $validator = Validator::make(['cover' => $cover], [
+            'cover' => ['required', 'mimetypes:image/jpeg,image/jpg,image/png'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()]);
+        } else {
+            $filename = md5(time().rand(0, 9999)) . '.jpg';
+            $path = public_path('/media/covers');
+
+            Image::make($cover->path())
+                ->fit(850, 310)
+                ->save("{$path}/{$filename}");
+
+            $user = User::find($this->currentUser['id']);
+            $user->cover = $filename;
+            $user->save();
+
+            return response()->json(['url' => url("/media/covers/{$filename}")]);
+        }
     }
 }
