@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Post;
 use App\Models\User;
+use App\Models\UserRelation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Intervention\Image\Facades\Image;
@@ -203,5 +205,45 @@ class UserController extends Controller
 
             return response()->json(['url' => url("/media/covers/{$filename}")]);
         }
+    }
+
+    /**
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function read($id = null)
+    {
+        $user = $id ? User::find($id) : $this->currentUser;
+
+        if ($user) {
+            $id = $user['id'];
+            $user['avatar'] = url("media/avatars/{$user['avatar']}");
+            $user['cover'] = url("media/covers/{$user['cover']}");
+            $user['me'] = $id === $this->currentUser['id'];
+
+            $dateFrom = new \DateTime($user['birth_date']);
+            $dateTo = new \DateTime('today');
+            $user['age'] = $dateFrom->diff($dateTo)->y;
+
+            $user['followers'] = UserRelation::where('user_to', $id)->count();
+            $user['following'] = UserRelation::where('user_from', $id)->count();
+            $user['photoCount'] = Post::where('id_user', $id)->where('type', 'photo')->count();
+
+            $isFollowing = false;
+
+            if (!$user['me']) {
+                $hasRelation = UserRelation::where('user_from', $this->currentUser['id'])
+                    ->where('user_to', $id)
+                    ->count();
+
+                $isFollowing = $hasRelation > 0;
+            }
+
+            $user['isFollowing'] = $isFollowing;
+
+            return response()->json($user);
+        }
+
+        return response()->json(['errors' => ['User not found.']], 404);
     }
 }
