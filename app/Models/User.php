@@ -29,4 +29,22 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
+
+    /**
+     * @param $value
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\Routing\UrlGenerator|string
+     */
+    public function getAvatarAttribute($value)
+    {
+        return $value ? url("media/avatars/{$value}") : '';
+    }
+
+    /**
+     * @param $value
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\Routing\UrlGenerator|string
+     */
+    public function getCoverAttribute($value)
+    {
+        return $value ? url("media/covers/{$value}") : '';
+    }
 }

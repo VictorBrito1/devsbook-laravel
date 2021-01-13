@@ -25,7 +25,7 @@ class UserController extends Controller
 
     /**
      * @param Request $request
-     * @return string[]
+     * @return array|\Illuminate\Http\JsonResponse
      */
     public function create(Request $request)
     {
@@ -38,38 +38,37 @@ class UserController extends Controller
             'birth_date' => ['required', 'date'],
         ]);
 
-        $array = [];
-
         if ($validator->fails()) {
-            $array['errors'] = $validator->errors();
-        } else {
-            $email = $data['email'];
-            $password = $data['password'];
-
-            $hash = password_hash($password, PASSWORD_DEFAULT);
-            $user = new User();
-            $user->name = $data['name'];
-            $user->email = $email;
-            $user->password = $hash;
-            $user->birth_date = $data['birth_date'];
-            $user->save();
-
-            $token = auth()->attempt([
-                'email' => $email,
-                'password' => $password
-            ]);
-
-            if (!$token) {
-                $array['errors'][] = 'Ocorreu um erro';
-                return $array;
-            }
-
-            $array['token'] = $token;
+            return response()->json(['errors' => $validator->errors()], 400);
         }
 
-        return $array;
+        $email = $data['email'];
+        $password = $data['password'];
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+
+        $user = new User();
+        $user->name = $data['name'];
+        $user->email = $email;
+        $user->password = $hash;
+        $user->birth_date = $data['birth_date'];
+        $user->save();
+
+        $token = auth()->attempt([
+            'email' => $email,
+            'password' => $password
+        ]);
+
+        if (!$token) {
+            return response()->json(['errors' => ['An error occurred.']], 500);
+        }
+
+        return response()->json(['token' => $token], 201);
     }
 
+    /**
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function update(Request $request)
     {
         $data = $request->only(['name', 'email', 'password', 'password_confirmation', 'birth_date', 'city', 'work']);
@@ -114,6 +113,7 @@ class UserController extends Controller
                 $errors[] = $validatorPassword->errors();
             }
         }
+
         if ($errors) {
             return response()->json(['errors' => $errors], 400);
         }
@@ -144,6 +144,7 @@ class UserController extends Controller
         }
 
         $user->save();
+
         return response()->json($user);
     }
 
@@ -160,21 +161,21 @@ class UserController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()]);
-        } else {
-            $filename = md5(time().rand(0, 9999)) . '.jpg';
-            $path = public_path('/media/avatars');
-
-            Image::make($avatar->path())
-                ->fit(200, 200)
-                ->save("{$path}/{$filename}");
-
-            $user = User::find($this->currentUser['id']);
-            $user->avatar = $filename;
-            $user->save();
-
-            return response()->json(['url' => url("/media/avatars/{$filename}")]);
+            return response()->json(['errors' => $validator->errors()], 400);
         }
+
+        $filename = md5(time().rand(0, 9999)) . '.jpg';
+        $path = public_path('/media/avatars');
+
+        Image::make($avatar->path())
+            ->fit(200, 200)
+            ->save("{$path}/{$filename}");
+
+        $user = User::find($this->currentUser['id']);
+        $user->avatar = $filename;
+        $user->save();
+
+        return response()->json(['url' => url("/media/avatars/{$filename}")]);
     }
 
     /**
@@ -190,21 +191,21 @@ class UserController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()]);
-        } else {
-            $filename = md5(time().rand(0, 9999)) . '.jpg';
-            $path = public_path('/media/covers');
-
-            Image::make($cover->path())
-                ->fit(850, 310)
-                ->save("{$path}/{$filename}");
-
-            $user = User::find($this->currentUser['id']);
-            $user->cover = $filename;
-            $user->save();
-
-            return response()->json(['url' => url("/media/covers/{$filename}")]);
+            return response()->json(['errors' => $validator->errors()], 400);
         }
+
+        $filename = md5(time().rand(0, 9999)) . '.jpg';
+        $path = public_path('/media/covers');
+
+        Image::make($cover->path())
+            ->fit(850, 310)
+            ->save("{$path}/{$filename}");
+
+        $user = User::find($this->currentUser['id']);
+        $user->cover = $filename;
+        $user->save();
+
+        return response()->json(['url' => url("/media/covers/{$filename}")]);
     }
 
     /**
@@ -214,12 +215,10 @@ class UserController extends Controller
      */
     public function read($id = null)
     {
-        $user = $id ? User::find($id) : $this->currentUser;
+        $id = (int)$id ?: $this->currentUser['id'];
+        $user = User::find($id);
 
         if ($user) {
-            $id = $user['id'];
-            $user['avatar'] = url("media/avatars/{$user['avatar']}");
-            $user['cover'] = url("media/covers/{$user['cover']}");
             $user['me'] = $id === $this->currentUser['id'];
 
             $dateFrom = new \DateTime($user['birth_date']);
@@ -255,7 +254,7 @@ class UserController extends Controller
     public function follow($id)
     {
        if ($id === $this->currentUser['id']) {
-           return response()->json(['errors' => ['You cannot follow yourself.']]);
+           return response()->json(['errors' => ['You cannot follow yourself.']], 400);
        }
 
        $user = User::find($id);
@@ -304,7 +303,7 @@ class UserController extends Controller
             $data['followers'][] = [
                 'id' => $user['id'],
                 'name' => $user['name'],
-                'avatar' => url("media/avatars/{$user['avatar']}"),
+                'avatar' => $user['avatar'],
             ];
         }
 
@@ -314,7 +313,7 @@ class UserController extends Controller
             $data['following'][] = [
                 'id' => $user['id'],
                 'name' => $user['name'],
-                'avatar' => url("media/avatars/{$user['avatar']}"),
+                'avatar' => $user['avatar'],
             ];
         }
 

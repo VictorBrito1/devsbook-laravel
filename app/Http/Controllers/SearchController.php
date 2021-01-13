@@ -35,7 +35,7 @@ class SearchController extends Controller
                 $data['users'][] = [
                     'id' => $user['id'],
                     'name' => $user['name'],
-                    'avatar' => url("media/avatars/{$user['avatar']}"),
+                    'avatar' => $user['avatar'],
                 ];
             }
 

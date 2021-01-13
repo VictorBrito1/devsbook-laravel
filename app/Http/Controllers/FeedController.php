@@ -15,6 +15,8 @@ class FeedController extends Controller
 {
     private $currentUser;
 
+    const PER_PAGE = 2;
+
     /**
      * FeedController constructor.
      */
@@ -41,64 +43,63 @@ class FeedController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
-        } else {
-            $type = $data['type'];
-            $body = $data['body'] ?? null;
-            $photo = $data['photo'] ?? null;
-            $returnArray = [];
-
-            switch ($type) {
-                case 'text':
-                    if (!$body) {
-                        $returnArray['errors']['body'] = 'Unsent text.';
-                    }
-
-                    break;
-                case 'photo':
-                    if ($photo) {
-                        $filename = md5(time().rand(0, 9999)) . '.jpg';
-                        $path = public_path('/media/uploads');
-
-                        Image::make($photo->path())
-                            ->resize(800, null, function($constraint) {
-                                $constraint->aspectRatio();
-                            })
-                            ->save("{$path}/{$filename}");
-
-                        $body = $filename;
-                    } else {
-                        $returnArray['errors']['photo'] = 'Unsent photo.';
-                    }
-
-                    break;
-                default:
-                    $returnArray['errors']['type'] = 'Wrong type. Valid are: "text" and "photo"';
-                    break;
-            }
-
-            if (isset($returnArray['errors'])) {
-                return response()->json($returnArray, 400);
-            }
-
-            $post = new Post();
-            $post->id_user = $this->currentUser->id;
-            $post->type = $type;
-            $post->created_at = date('Y-m-d H:i:s');
-            $post->body = $body;
-            $post->save();
-
-            return response()->json($post, 201);
         }
+
+        $type = $data['type'];
+        $body = $data['body'] ?? null;
+        $photo = $data['photo'] ?? null;
+        $returnArray = [];
+
+        switch ($type) {
+            case 'text':
+                if (!$body) {
+                    $returnArray['errors']['body'] = 'Unsent text.';
+                }
+
+                break;
+            case 'photo':
+                if ($photo) {
+                    $filename = md5(time().rand(0, 9999)) . '.jpg';
+                    $path = public_path('/media/uploads');
+
+                    Image::make($photo->path())
+                        ->resize(800, null, function($constraint) {
+                            $constraint->aspectRatio();
+                        })
+                        ->save("{$path}/{$filename}");
+
+                    $body = $filename;
+                } else {
+                    $returnArray['errors']['photo'] = 'Unsent photo.';
+                }
+
+                break;
+            default:
+                $returnArray['errors']['type'] = 'Wrong type. Valid are: "text" and "photo"';
+                break;
+        }
+
+        if (isset($returnArray['errors'])) {
+            return response()->json($returnArray, 400);
+        }
+
+        $post = new Post();
+        $post->id_user = $this->currentUser->id;
+        $post->type = $type;
+        $post->created_at = date('Y-m-d H:i:s');
+        $post->body = $body;
+        $post->save();
+
+        return response()->json($post, 201);
     }
 
     /**
      * @param Request $request
-     * @return array
+     * @return \Illuminate\Http\JsonResponse
      */
     public function read(Request $request)
     {
         $page = intval($request->get('page', 1));
-        $perPage = 2;
         $response = [];
         $users = [];
 
@@ -112,73 +113,71 @@ class FeedController extends Controller
 
         $posts = Post::whereIn('id_user', $users)
             ->orderBy('created_at', 'desc')
-            ->offset(($page - 1) * $perPage)
-            ->limit($perPage)
+            ->offset(($page - 1) * self::PER_PAGE)
+            ->limit(self::PER_PAGE)
             ->get();
 
         $posts = $this->postListToObject($posts, $this->currentUser['id']);
 
         $totalPosts = Post::whereIn('id_user', $users)->count();
-        $pageCount = ceil($totalPosts / $perPage);
+        $pageCount = ceil($totalPosts / self::PER_PAGE);
 
         $response['posts'] = $posts;
         $response['pageCount'] = $pageCount;
         $response['currentPage'] = $page;
 
-        return $response;
+        return response()->json($response);
     }
 
     /**
      * @param Request $request
      * @param null $id
-     * @return mixed
+     * @return \Illuminate\Http\JsonResponse
      */
     public function userFeed(Request $request, $id = null)
     {
         $id = $id ?? $this->currentUser->id;
         $page = intval($request->get('page', 1));
-        $perPage = 2;
 
         $posts = Post::where('id_user', $id)
             ->orderBy('created_at', 'desc')
-            ->offset(($page - 1) * $perPage)
-            ->limit($perPage)
+            ->offset(($page - 1) * self::PER_PAGE)
+            ->limit(self::PER_PAGE)
             ->get();
 
         $posts = $this->postListToObject($posts, $this->currentUser['id']);
 
         $totalPosts = Post::where('id_user', $id)->count();
-        $pageCount = ceil($totalPosts / $perPage);
+        $pageCount = ceil($totalPosts / self::PER_PAGE);
 
         $response['posts'] = $posts;
         $response['pageCount'] = $pageCount;
         $response['currentPage'] = $page;
 
-        return $response;
+        return response()->json($response);
     }
 
     /**
      * @param Request $request
      * @param null $id
-     * @return mixed
+     * @return \Illuminate\Http\JsonResponse
      */
     public function userPhotos(Request $request, $id = null)
     {
         $id = $id ?? $this->currentUser->id;
         $page = intval($request->get('page', 1));
-        $perPage = 2;
 
         $posts = Post::where('id_user', $id)
             ->where('type', 'photo')
             ->orderBy('created_at', 'desc')
-            ->offset(($page - 1) * $perPage)
-            ->limit($perPage)
+            ->offset(($page - 1) * self::PER_PAGE)
+            ->limit(self::PER_PAGE)
             ->get();
 
         $posts = $this->postListToObject($posts, $this->currentUser['id']);
 
         $totalPosts = Post::where('id_user', $id)->where('type', 'photo')->count();
-        $pageCount = ceil($totalPosts / $perPage);
+        $pageCount = ceil($totalPosts / self::PER_PAGE);
 
         foreach ($posts as $key => $post) {
             $posts[$key]['body'] = url("media/uploads/{$posts[$key]['body']}");
@@ -188,7 +187,7 @@ class FeedController extends Controller
         $response['pageCount'] = $pageCount;
         $response['currentPage'] = $page;
 
-        return $response;
+        return response()->json($response);
     }
 
     /**
@@ -200,11 +199,7 @@ class FeedController extends Controller
     {
         foreach ($posts as $key => $post) {
             $posts[$key]['mine'] = $post['id_user'] === $currentUserId;
-
-            $userInfo = User::find($post['id_user']);
-            $userInfo['avatar'] = url("media/avatars/{$userInfo['avatar']}");
-            $userInfo['cover'] = url("media/covers/{$userInfo['cover']}");
-            $posts[$key]['user'] = $userInfo;
+            $posts[$key]['user'] = User::find($post['id_user']);
 
             $likes = PostLike::where('id_post', $post['id'])->count();
             $isLiked = (bool)PostLike::where('id_post', $post['id'])
@@ -216,11 +211,8 @@ class FeedController extends Controller
 
             $comments = PostComment::where('id_post', $post['id'])->get();
 
-            foreach ($comments as $key => $comment) {
-                $user = User::find($comment['id_user']);
-                $user['avatar'] = url("media/avatars/{$user['avatar']}");
-                $user['cover'] = url("media/covers/{$user['cover']}");
-                $comments[$key]['user'] = $user;
+            foreach ($comments as $cKey => $comment) {
+                $comments[$cKey]['user'] = User::find($comment['id_user']);
             }
 
             $posts[$key]['comments'] = $comments;

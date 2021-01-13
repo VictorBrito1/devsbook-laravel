@@ -83,7 +83,7 @@ class PostController extends Controller
 
             $data = [
                 'id_user' => $this->currentUser['id'],
-                'avatar' => url("media/avatars/{$this->currentUser['avatar']}"),
+                'avatar' => $this->currentUser['avatar'],
                 'body' => $body,
             ];
 
