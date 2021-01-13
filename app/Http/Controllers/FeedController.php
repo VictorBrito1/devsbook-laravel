@@ -158,6 +158,40 @@ class FeedController extends Controller
     }
 
     /**
+     * @param Request $request
+     * @param null $id
+     * @return mixed
+     */
+    public function userPhotos(Request $request, $id = null)
+    {
+        $id = $id ?? $this->currentUser->id;
+        $page = intval($request->get('page', 1));
+        $perPage = 2;
+
+        $posts = Post::where('id_user', $id)
+            ->where('type', 'photo')
+            ->orderBy('created_at', 'desc')
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get();
+
+        $posts = $this->postListToObject($posts, $this->currentUser['id']);
+
+        $totalPosts = Post::where('id_user', $id)->where('type', 'photo')->count();
+        $pageCount = ceil($totalPosts / $perPage);
+
+        foreach ($posts as $key => $post) {
+            $posts[$key]['body'] = url("media/uploads/{$posts[$key]['body']}");
+        }
+
+        $response['posts'] = $posts;
+        $response['pageCount'] = $pageCount;
+        $response['currentPage'] = $page;
+
+        return $response;
+    }
+
+    /**
      * @param $posts
      * @param $currentUserId
      * @return mixed

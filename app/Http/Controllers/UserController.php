@@ -208,8 +208,9 @@ class UserController extends Controller
     }
 
     /**
-     * @param $id
+     * @param null $id
      * @return \Illuminate\Http\JsonResponse
+     * @throws \Exception
      */
     public function read($id = null)
     {
@@ -245,5 +246,78 @@ class UserController extends Controller
         }
 
         return response()->json(['errors' => ['User not found.']], 404);
+    }
+
+    /**
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function follow($id)
+    {
+       if ($id === $this->currentUser['id']) {
+           return response()->json(['errors' => ['You cannot follow yourself.']]);
+       }
+
+       $user = User::find($id);
+
+       if (!$user) {
+           return response()->json(['errors' => ['User does not exist.']], 404);
+       }
+
+       $relation = UserRelation::where('user_from', $this->currentUser['id'])->where('user_to', $id)->first();
+       $following = false;
+
+       if ($relation) {
+           $relation->delete();
+       } else {
+           $relation = new UserRelation();
+           $relation->user_from = $this->currentUser['id'];
+           $relation->user_to = $id;
+           $relation->save();
+
+           $following = true;
+       }
+
+       return response()->json(['following' => $following]);
+    }
+
+    /**
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function followers($id)
+    {
+        $user = User::find($id);
+
+        if (!$user) {
+            return response()->json(['errors' => ['User does not exist.']], 404);
+        }
+
+        $data = [];
+
+        $followers = UserRelation::where('user_to', $id)->get();
+        $following = UserRelation::where('user_from', $id)->get();
+
+        foreach ($followers as $item) {
+            $user = User::find($item['user_from']);
+
+            $data['followers'][] = [
+                'id' => $user['id'],
+                'name' => $user['name'],
+                'avatar' => url("media/avatars/{$user['avatar']}"),
+            ];
+        }
+
+        foreach ($following as $item) {
+            $user = User::find($item['user_to']);
+
+            $data['following'][] = [
+                'id' => $user['id'],
+                'name' => $user['name'],
+                'avatar' => url("media/avatars/{$user['avatar']}"),
+            ];
+        }
+
+        return response()->json($data);
     }
 }
